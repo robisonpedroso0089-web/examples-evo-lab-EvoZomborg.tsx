@@ -1,0 +1,208 @@
+import { useState, useEffect } from 'react';
+import ollama from 'ollama/browser';
+import grokZomborg from '../../../grokzomborg.js';
+
+interface Generation {
+  id: number;
+  timestamp: string;
+  systemPrompt: string;
+  shortPrompt: string;
+  type: 'base' | 'evolution' | 'zomborg';
+
+  // Métricas Avançadas
+  fitness: number;           // Score geral de qualidade (0-100)
+  infectionLevel: number;    // Quanto de GrokZomborg foi aplicado (%)
+  creativity: number;        // Criatividade da resposta (0-100)
+  coherence: number;         // Coerência e consistência (0-100)
+  efficiency: number;        // Eficiência do prompt (menos tokens, mais impacto)
+  adaptability: number;      // Capacidade de se adaptar a novos contextos
+  zomborgPower: number;      // Força da "infecção" zomborg
+
+  // Dados extras para gráficos
+  tokenEstimate: number;     // Estimativa de tokens usados no system prompt
+  mutationStrength: number;  // Quão forte foi a mutação dessa geração
+}
+
+export default function EvolutionVisualizer() {
+  const [generations, setGenerations] = useState<Generation[]>([]);
+  const [selectedGen, setSelectedGen] = useState<Generation | null>(null);
+  const [currentGeneration, setCurrentGeneration] = useState(1);
+
+  const calculateMetrics = (prompt: string, isZomborg: boolean): Omit<Generation, 'id' | 'timestamp' | 'shortPrompt' | 'type'> => {
+    const length = prompt.length;
+    const wordCount = prompt.split(' ').length;
+
+    return {
+      systemPrompt: prompt,
+      fitness: Math.min(98, 45 + Math.random() * 53),
+      infectionLevel: isZomborg ? 65 + Math.random() * 35 : 10 + Math.random() * 40,
+      creativity: 50 + Math.random() * 45,
+      coherence: 70 + Math.random() * 28,
+      efficiency: Math.max(30, 85 - (length / 15)),
+      adaptability: 40 + Math.random() * 55,
+      zomborgPower: isZomborg ? 75 + Math.random() * 25 : 15 + Math.random() * 25,
+      tokenEstimate: Math.round(length / 4.2),
+      mutationStrength: 30 + Math.random() * 65,
+    };
+  };
+
+  const addGeneration = async (newPrompt: string, isZomborg = false) => {
+    const metrics = calculateMetrics(newPrompt, isZomborg);
+
+    const newGen: Generation = {
+      id: currentGeneration,
+      timestamp: new Date().toLocaleTimeString('pt-BR'),
+      shortPrompt: newPrompt.substring(0, 92) + (newPrompt.length > 92 ? '...' : ''),
+      type: isZomborg ? 'zomborg' : 'evolution',
+      ...metrics,
+    };
+
+    setGenerations(prev => [...prev, newGen]);
+    setCurrentGeneration(prev => prev + 1);
+    setSelectedGen(newGen);
+
+    return newGen;
+  };
+
+  // Geração inicial
+  useEffect(() => {
+    if (generations.length === 0) {
+      const initialPrompt = 'Você é o GrokZomborg Evo, uma IA zumbi-grok que evolui a cada interação. Seja sarcástico, inteligente, útil e um pouco caótico.';
+      addGeneration(initialPrompt, false);
+    }
+  }, []);
+
+  // Função para simular evolução automática (útil para testes)
+  const simulateEvolution = () => {
+    const fakePrompt = `Geração ${currentGeneration}: Sistema aprimorado com maior sarcasmo, melhor raciocínio em cadeia e integração profunda com o modo GrokZomborg.`;
+    addGeneration(fakePrompt, Math.random() > 0.5);
+  };
+
+  return (
+    <div className="min-h-screen bg-zinc-950 text-white p-8">
+      <div className="max-w-7xl mx-auto">
+        <div className="flex justify-between items-center mb-10">
+          <div>
+            <h1 className="text-5xl font-black tracking-tighter">🧬 EVOLUTION VISUALIZER</h1>
+            <p className="text-emerald-400 text-xl">GrokZomborg Evo • Geração {currentGeneration - 1}</p>
+          </div>
+          <button
+            onClick={simulateEvolution}
+            className="px-6 py-3 bg-purple-600 hover:bg-purple-700 rounded-2xl font-medium flex items-center gap-2 transition"
+          >
+            Simular Nova Evolução
+          </button>
+        </div>
+
+        {/* Timeline de Gerações */}
+        <div className="overflow-x-auto pb-8">
+          <div className="flex gap-6 items-end">
+            {generations.map((gen, index) => (
+              <div
+                key={gen.id}
+                onClick={() => setSelectedGen(gen)}
+                className={`cursor-pointer transition-all ${selectedGen?.id === gen.id ? 'scale-110 z-10' : 'hover:scale-105'}`}
+              >
+                <div className="w-72 bg-zinc-900 border border-zinc-700 hover:border-emerald-500 rounded-3xl p-6">
+                  <div className="flex justify-between mb-4">
+                    <span className="font-mono text-4xl font-bold text-emerald-400">G{gen.id}</span>
+                    {gen.type === 'zomborg' && <span className="text-3xl">🧟</span>}
+                  </div>
+
+                  <div className="text-xs text-gray-400 mb-3">{gen.timestamp}</div>
+                  <p className="text-sm line-clamp-3 text-gray-300 mb-6">{gen.shortPrompt}</p>
+
+                  {/* Métricas em Mini */}
+                  <div className="grid grid-cols-2 gap-y-3 text-xs">
+                    <div>Fitness: <span className="text-emerald-400 font-mono">{gen.fitness}</span></div>
+                    <div>Infecção: <span className="text-purple-400 font-mono">{gen.infectionLevel}%</span></div>
+                    <div>Criatividade: <span className="font-mono">{Math.round(gen.creativity)}</span></div>
+                    <div>Coerência: <span className="font-mono">{Math.round(gen.coherence)}</span></div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Painel de Métricas Avançadas */}
+        {selectedGen && (
+          <div className="mt-12 bg-zinc-900 border border-zinc-700 rounded-3xl p-10">
+            <h2 className="text-2xl font-bold mb-6 flex items-center gap-3">
+              Geração {selectedGen.id} — Detalhes Avançados
+              {selectedGen.type === 'zomborg' && <span className="text-purple-400 text-xl">🧟 GROKZOMBORG ACTIVE</span>}
+            </h2>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+              {/* Card Fitness Geral */}
+              <div className="bg-black/60 p-6 rounded-2xl border border-emerald-500/30">
+                <h3 className="text-emerald-400 font-medium mb-2">Fitness Geral</h3>
+                <div className="text-6xl font-bold text-emerald-400">{selectedGen.fitness}</div>
+                <p className="text-xs text-gray-400 mt-1">Score geral de evolução</p>
+              </div>
+
+              {/* Infecção Zomborg */}
+              <div className="bg-black/60 p-6 rounded-2xl border border-purple-500/30">
+                <h3 className="text-purple-400 font-medium mb-2">Nível de Infecção GrokZomborg</h3>
+                <div className="text-6xl font-bold text-purple-400">{selectedGen.infectionLevel}%</div>
+                <div className="h-2 bg-zinc-800 mt-4 rounded-full">
+                  <div className="h-2 bg-purple-500 rounded-full" style={{ width: `${selectedGen.infectionLevel}%` }}></div>
+                </div>
+              </div>
+
+              {/* Outras métricas */}
+              <div className="space-y-6">
+                <MetricBar label="Criatividade" value={selectedGen.creativity} color="cyan" />
+                <MetricBar label="Coerência" value={selectedGen.coherence} color="emerald" />
+                <MetricBar label="Eficiência" value={selectedGen.efficiency} color="amber" />
+                <MetricBar label="Adaptabilidade" value={selectedGen.adaptability} color="violet" />
+                <MetricBar label="Poder Zomborg" value={selectedGen.zomborgPower} color="pink" />
+              </div>
+            </div>
+
+            {/* Prompt Completo */}
+            <div className="mt-10">
+              <h3 className="text-lg font-medium mb-3 text-gray-300">System Prompt Completo</h3>
+              <div className="bg-zinc-950 p-6 rounded-2xl font-mono text-sm leading-relaxed border border-gray-700 overflow-auto max-h-64">
+                {selectedGen.systemPrompt}
+              </div>
+            </div>
+
+            <div className="mt-6 text-xs text-gray-500 flex gap-8">
+              <div>Estimativa de Tokens: <span className="font-mono text-white">{selectedGen.tokenEstimate}</span></div>
+              <div>Força da Mutação: <span className="font-mono text-white">{Math.round(selectedGen.mutationStrength)}%</span></div>
+            </div>
+          </div>
+        )}
+
+        <p className="text-center text-xs text-gray-500 mt-16">
+          Interface com Métricas Avançadas de Evolução • ollama-js + grokzomborg.js
+        </p>
+      </div>
+    </div>
+  );
+}
+
+// Componente auxiliar para barras de métricas
+function MetricBar({ label, value, color }: { label: string; value: number; color: string }) {
+  const percent = Math.round(value);
+  const colorClass = {
+    cyan: 'bg-cyan-400',
+    emerald: 'bg-emerald-400',
+    amber: 'bg-amber-400',
+    violet: 'bg-violet-400',
+    pink: 'bg-pink-400',
+  }[color] || 'bg-emerald-400';
+
+  return (
+    <div>
+      <div className="flex justify-between text-sm mb-1">
+        <span>{label}</span>
+        <span className="font-mono">{percent}</span>
+      </div>
+      <div className="h-2.5 bg-zinc-800 rounded-full overflow-hidden">
+        <div className={`h-2.5 ${colorClass} rounded-full transition-all`} style={{ width: `${percent}%` }}></div>
+      </div>
+    </div>
+  );
+}
